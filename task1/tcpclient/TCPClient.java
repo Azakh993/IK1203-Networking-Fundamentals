@@ -10,28 +10,52 @@ public class TCPClient {
 	}
 
 	public byte[] askServer( String hostname, int port, byte[] toServerBytes ) throws IOException {
-		ByteArrayOutputStream receive_buffer = new ByteArrayOutputStream();
-		byte[] buffer_array = new byte[ BUFFER_SIZE ];
+		byte[] bytesFromServer = new byte[ 0 ];
 		try {
 			Socket socket = new Socket( hostname, port );
 
-			OutputStream outputStream = socket.getOutputStream();
-			outputStream.write( toServerBytes );
+			write_to_socket( socket, toServerBytes );
+			bytesFromServer = retrieve_from_socket( socket );
 
-			InputStream inputStream = socket.getInputStream();
-			while ( inputStream.read( buffer_array ) != -1 ) {
-				receive_buffer.write( buffer_array );
-			}
 			socket.close();
 		}
 		catch ( Exception exception ) {
 			exception.printStackTrace();
 		}
 
-		return receive_buffer.toByteArray();
+		return bytesFromServer;
 	}
 
 	public byte[] askServer( String hostname, int port ) throws IOException {
-		return new byte[ 0 ];
+		byte[] bytesFromServer = new byte[ 0 ];
+		try {
+			Socket socket = new Socket( hostname, port );
+
+			bytesFromServer = retrieve_from_socket( socket );
+
+			socket.close();
+		}
+		catch ( Exception exception ) {
+			exception.printStackTrace();
+		}
+
+		return bytesFromServer;
+	}
+
+	private void write_to_socket( Socket socket, byte[] bytesToServer ) throws IOException {
+		OutputStream outputStream = socket.getOutputStream();
+		outputStream.write( bytesToServer );
+	}
+
+	private byte[] retrieve_from_socket( Socket socket ) throws IOException {
+		ByteArrayOutputStream dynamicBuffer = new ByteArrayOutputStream();
+		byte[] buffer = new byte[ BUFFER_SIZE ];
+
+		InputStream inputStream = socket.getInputStream();
+		while ( inputStream.read( buffer ) != -1 ) {
+			dynamicBuffer.write( buffer );
+		}
+
+		return dynamicBuffer.toByteArray();
 	}
 }
