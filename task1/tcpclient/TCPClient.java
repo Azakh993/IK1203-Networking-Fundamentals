@@ -49,8 +49,10 @@ public class TCPClient {
 	private byte[] retrieve_from_socket( Socket socket ) throws IOException {
 		ByteArrayOutputStream dynamicBuffer = new ByteArrayOutputStream();
 		byte[] buffer = new byte[ BUFFER_SIZE ];
+
 		socket.setSoTimeout( TIME_OUT );
 		InputStream inputStream = socket.getInputStream();
+
 		while ( inputStream.read( buffer ) != -1 ) {
 			dynamicBuffer.write( buffer );
 		}
