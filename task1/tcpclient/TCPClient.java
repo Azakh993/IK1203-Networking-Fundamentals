@@ -5,11 +5,16 @@ import java.io.*;
 
 public class TCPClient {
 	private final static int BUFFER_SIZE = 1024;
+	private final static int TIME_OUT = 5000;
 
 	public TCPClient() {
 	}
 
 	public byte[] askServer( String hostname, int port, byte[] toServerBytes ) throws IOException {
+		if ( toServerBytes.length == 0 ) {
+			return askServer( hostname, port );
+		}
+
 		byte[] bytesFromServer = new byte[ 0 ];
 		try {
 			Socket socket = new Socket( hostname, port );
@@ -27,17 +32,11 @@ public class TCPClient {
 	}
 
 	public byte[] askServer( String hostname, int port ) throws IOException {
-		byte[] bytesFromServer = new byte[ 0 ];
-		try {
-			Socket socket = new Socket( hostname, port );
+		Socket socket = new Socket( hostname, port );
 
-			bytesFromServer = retrieve_from_socket( socket );
+		byte[] bytesFromServer = retrieve_from_socket( socket );
 
-			socket.close();
-		}
-		catch ( Exception exception ) {
-			exception.printStackTrace();
-		}
+		socket.close();
 
 		return bytesFromServer;
 	}
@@ -50,7 +49,7 @@ public class TCPClient {
 	private byte[] retrieve_from_socket( Socket socket ) throws IOException {
 		ByteArrayOutputStream dynamicBuffer = new ByteArrayOutputStream();
 		byte[] buffer = new byte[ BUFFER_SIZE ];
-
+		socket.setSoTimeout( TIME_OUT );
 		InputStream inputStream = socket.getInputStream();
 		while ( inputStream.read( buffer ) != -1 ) {
 			dynamicBuffer.write( buffer );
