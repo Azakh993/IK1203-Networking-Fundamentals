@@ -53,8 +53,10 @@ public class TCPClient {
 		socket.setSoTimeout( TIME_OUT );
 		InputStream inputStream = socket.getInputStream();
 
-		while ( inputStream.read( buffer ) != -1 ) {
-			dynamicBuffer.write( buffer );
+		int readBytes;
+
+		while ( ( readBytes = inputStream.read( buffer ) ) != -1 ) {
+			dynamicBuffer.write( buffer, 0, readBytes );
 		}
 
 		return dynamicBuffer.toByteArray();
