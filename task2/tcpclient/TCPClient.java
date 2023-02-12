@@ -4,12 +4,12 @@ import java.net.*;
 import java.io.*;
 
 public class TCPClient {
-	private final static int BUFFER_SIZE = 1024;
+	private static int buffer_size = 1024;
 	private static boolean shutdown_boolean;
 	private static Integer timeout_ms;
 	private static Integer limit_bytes;
 
-	public TCPClient(boolean shutdown, Integer timeout, Integer limit) {
+	public TCPClient( boolean shutdown, Integer timeout, Integer limit ) {
 		shutdown_boolean = shutdown;
 		timeout_ms = timeout == null || timeout < 0 ? 0 : timeout;
 		limit_bytes = limit;
@@ -20,22 +20,34 @@ public class TCPClient {
 			return askServer( hostname, port );
 		}
 
-		Socket socket = new Socket( hostname, port );
+		byte[] bytesFromServer = new byte[ 0 ];
+		try {
+			Socket socket = new Socket( hostname, port );
 
-		write_to_socket( socket, toServerBytes );
-		byte[] bytesFromServer = retrieve_from_socket( socket );
+			write_to_socket( socket, toServerBytes );
+			bytesFromServer = retrieve_from_socket( socket );
 
-		socket.close();
+			socket.close();
+		}
+		catch ( Exception exception ) {
+			exception.printStackTrace();
+		}
 
 		return bytesFromServer;
 	}
 
-	public byte[] askServer( String hostname, int port ) throws IOException{
-		Socket socket = new Socket( hostname, port );
+	public byte[] askServer( String hostname, int port ) throws IOException {
+		byte[] bytesFromServer = new byte[ 0 ];
+		try {
+			Socket socket = new Socket( hostname, port );
 
-		byte[] bytesFromServer = retrieve_from_socket( socket );
+			bytesFromServer = retrieve_from_socket( socket );
 
-		socket.close();
+			socket.close();
+		}
+		catch ( Exception exception ) {
+			exception.printStackTrace();
+		}
 
 		return bytesFromServer;
 	}
@@ -43,25 +55,47 @@ public class TCPClient {
 	private void write_to_socket( Socket socket, byte[] bytesToServer ) throws IOException {
 		OutputStream outputStream = socket.getOutputStream();
 		outputStream.write( bytesToServer );
-		if (shutdown_boolean)
-			socket.shutdownOutput(); // Check
+		if ( shutdown_boolean ) {
+			socket.shutdownOutput();
+		}
 	}
 
 	private byte[] retrieve_from_socket( Socket socket ) throws IOException {
 		ByteArrayOutputStream dynamicBuffer = new ByteArrayOutputStream();
-		byte[] buffer = new byte[ BUFFER_SIZE ];
 
-		socket.setSoTimeout( timeout_ms ); // Check
-		InputStream inputStream = socket.getInputStream();
+		if ( limit_bytes != null && buffer_size < limit_bytes ) {
+			buffer_size = limit_bytes;
+		}
 
-		Integer limit = limit_bytes;
+		byte[] buffer = new byte[ buffer_size ];
 
-		while ( ( limit == null || limit > 0 ) && inputStream.read( buffer ) != -1 ) { // Check
-			dynamicBuffer.write( buffer );
-			if( limit != null ) {
-				limit--;
+		try {
+			InputStream inputStream = socket.getInputStream();
+			socket.setSoTimeout( timeout_ms );
+
+			int readBytes;
+
+			if ( limit_bytes == null ) {
+				while ( ( readBytes = inputStream.read( buffer ) ) != -1 ) {
+					dynamicBuffer.write( buffer, 0, readBytes );
+				}
+			} else {
+				int limit = limit_bytes;
+				while ( ( readBytes = inputStream.read( buffer, 0, limit ) ) != -1 ) {
+					dynamicBuffer.write( buffer, 0, readBytes );
+
+					limit -= readBytes;
+					if ( limit == 0 ) {
+						break;
+					}
+				}
 			}
 		}
+		catch ( SocketTimeoutException exception ) {
+			System.out.println( "Socket Timeout!\n" );
+		}
+
+		System.out.println(dynamicBuffer.size());
 
 		return dynamicBuffer.toByteArray();
 	}
