@@ -95,8 +95,6 @@ public class TCPClient {
 			System.out.println( "Socket Timeout!\n" );
 		}
 
-		System.out.println(dynamicBuffer.size());
-
 		return dynamicBuffer.toByteArray();
 	}
 }
