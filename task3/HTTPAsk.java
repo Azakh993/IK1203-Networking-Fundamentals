@@ -1,11 +1,15 @@
 import tcpclient.TCPClient;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.*;
-import java.io.*;
 import java.util.HashMap;
 
 public class HTTPAsk {
     private final static String NEWLINE = "\r\n";
+    private final static String CONNECTION = "Connection: close" + NEWLINE;
+    private final static String CONTENT_TYPE = "Content-Type: text/plain" + NEWLINE;
     private static HashMap< String, Object > arguments;
 
     public static void main(String[] args) {
@@ -25,13 +29,16 @@ public class HTTPAsk {
                     System.out.println("Processed request...");
 
                     OutputStream output = socket.getOutputStream();
-                    boolean parameters_valid = verify_parameters(output);
+                    String http_status_code = get_http_status_code(unparsedRequest);
 
-                    if (parameters_valid) {
+                    if (http_status_code.equals("200")) {
                         byte[] serverResponse = ask_server();
-                        output_response(output, serverResponse);
+                        int responseSize = serverResponse.length;
+                        output_response_header(output, responseSize);
+                        output_data(output, serverResponse);
+                    } else {
+                        output_response_header(output, http_status_code);
                     }
-
                     socket.close();
                     System.out.println("Closed connection!");
 
@@ -39,7 +46,7 @@ public class HTTPAsk {
                     System.err.println(exception);
                 }
             }
-        } catch (Exception exception){
+        } catch (Exception exception) {
             System.err.println(exception);
         }
     }
@@ -93,35 +100,26 @@ public class HTTPAsk {
     }
 
 
-    private static boolean verify_parameters(OutputStream output) throws IOException {
+    private static String get_http_status_code(String unparsedParameters) {
         boolean hostProvided = arguments.containsKey("hostname");
         boolean portProvided = arguments.containsKey("port");
+        boolean urlValid = verify_url(unparsedParameters);
         boolean getValid = arguments.containsKey("GET") && arguments.get("GET").equals("VALID");
         boolean askValid = arguments.containsKey("/ask") && arguments.get("/ask").equals("VALID");
         boolean httpValid = arguments.containsKey("HTTP/1.1") && arguments.get("HTTP/1.1").equals("VALID");
 
-        String HTTP400 = "HTTP/1.1 400 Bad Request" + NEWLINE;
-        String HTTP404 = "HTTP/1.1 404 Not Found" + NEWLINE;
-        String HTTP505 = "HTTP/1.1 505 HTTP Version Not Supported" + NEWLINE;
-        String HTTP200 = "HTTP/1.1 200 OK" + NEWLINE;
-        String connection = "Connection: close" + NEWLINE;
-        String contentType = "Content-Type: text/plain" + NEWLINE;
-
-        if (!getValid) {
-            output.write((HTTP400 + connection + contentType + NEWLINE).getBytes());
-            return false;
+        if (!urlValid) {
+            return "400";
+        } else if (!getValid) {
+            return "501";
         } else if (!askValid) {
-            output.write((HTTP404 + connection + contentType + NEWLINE).getBytes());
-            return false;
+            return "404";
         } else if (!hostProvided || !portProvided) {
-            output.write((HTTP400 + connection + contentType + NEWLINE).getBytes());
-            return false;
+            return "422";
         } else if (!httpValid) {
-            output.write((HTTP505 + connection + contentType + NEWLINE).getBytes());
-            return false;
+            return "505";
         } else {
-            output.write((HTTP200 + connection + contentType).getBytes());
-            return true;
+            return "200";
         }
     }
 
@@ -145,9 +143,13 @@ public class HTTPAsk {
         }
     }
 
+    private static void output_response_header(OutputStream output, int responseSize) throws IOException {
+        String HTTP200 = "HTTP/1.1 200 OK" + NEWLINE;
+        String contentLength = "Content-Length: " + responseSize + NEWLINE;
+        output.write((HTTP200 + contentLength + CONNECTION + CONTENT_TYPE + NEWLINE).getBytes());
+    }
 
-    private static void output_response(OutputStream output, byte[] serverResponse) throws IOException {
-        output.write(("Content-Length: " + serverResponse.length + NEWLINE + NEWLINE).getBytes());
+    private static void output_data(OutputStream output, byte[] serverResponse) throws IOException {
         if (serverResponse.length > 0) {
             output.write(serverResponse);
 
@@ -155,6 +157,34 @@ public class HTTPAsk {
             if (lastCharOfResponse != '\n') {
                 output.write(NEWLINE.getBytes());
             }
+        }
+    }
+
+    private static void output_response_header(OutputStream output, String http_status_code) throws IOException {
+        byte[] HTTP400 = ("HTTP/1.1 400 Bad Request" + NEWLINE).getBytes();
+        byte[] HTTP422 = ("HTTP/1.1 422 Unprocessable Entity" + NEWLINE).getBytes();
+        byte[] HTTP404 = ("HTTP/1.1 404 Not Found" + NEWLINE).getBytes();
+        byte[] HTTP501 = ("HTTP/1.1 501 Not Implemented" + NEWLINE).getBytes();
+        byte[] HTTP505 = ("HTTP/1.1 505 HTTP Version Not Supported" + NEWLINE).getBytes();
+
+        switch (http_status_code) {
+            case "400" -> output.write(HTTP400);
+            case "422" -> output.write(HTTP422);
+            case "404" -> output.write(HTTP404);
+            case "501" -> output.write(HTTP501);
+            case "505" -> output.write(HTTP505);
+        }
+        output.write((CONNECTION + CONTENT_TYPE + NEWLINE).getBytes());
+    }
+
+    private static boolean verify_url(String unparsedParameters) {
+        String requestWithoutGETandHTTP = unparsedParameters.split(" ")[1];
+
+        try {
+            new URL("http://localhost:1234" + requestWithoutGETandHTTP).toURI();
+            return true;
+        } catch (MalformedURLException | URISyntaxException exception) {
+            return false;
         }
     }
 }
